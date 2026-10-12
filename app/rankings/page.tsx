@@ -4,10 +4,34 @@ import Link from 'next/link';
 import { usePlayers } from '@/components/use-players';
 import { HeadAvatar } from '@/components/player-table';
 import { TierBadge } from '@/components/tier-badge';
-const tiers = ['HT1','LT1','HT2','LT2','HT3','LT3','HT4','LT4','HT5','LT5'];
-const descriptions: Record<string,string> = {HT1:'The absolute peak. The best of the best.',LT1:'Elite level, just below the summit.',HT2:'Exceptional skill and consistency.',LT2:'Highly skilled and battle-tested.',HT3:'A strong competitor with proven ability.',LT3:'Solid skill with room to climb.',HT4:'Developing into a serious contender.',LT4:'Building consistency and confidence.',HT5:'The first step into ranked play.',LT5:'Every climb starts somewhere.'};
+
+const modes = ['A Totem', 'Shieldless SMP'] as const;
+const columns = [
+  { title: 'Tier 1', tiers: ['HT1', 'LT1'] },
+  { title: 'Tier 2', tiers: ['HT2', 'LT2'] },
+  { title: 'Tier 3', tiers: ['HT3', 'LT3'] },
+  { title: 'Tier 4', tiers: ['HT4', 'LT4'] },
+  { title: 'Tier 5', tiers: ['HT5', 'LT5'] },
+];
 export default function RankingsPage() {
- const { players, loading } = usePlayers(); const [selected, setSelected] = useState('HT1');
- const ranked = useMemo(() => players.filter(p => p.tier === selected).sort((a,b) => a.minecraftUsername.localeCompare(b.minecraftUsername)), [players,selected]);
- return <div className="page-wrap"><div className="page-hero"><div className="eyebrow">TIER INDEX / COMPETITIVE LADDER</div><h1>Know your <span>rank.</span></h1><p>Ten tiers. Five levels. Two divisions. Every spot on the ladder is earned.</p><div className="mode-tabs"><button className="mode-tab mode-tab-active">A Totem</button><button className="mode-tab">Shieldless SMP</button></div><div className="page-hero-bottom"><div className="stat-chip"><strong>10</strong><span>TIER DIVISIONS</span></div><div className="stat-chip"><strong>{players.length}</strong><span>RANKED PLAYERS</span></div></div></div><div className="rankings-layout"><aside className="tier-sidebar"><div className="sidebar-label">THE LADDER <span>01 — 10</span></div>{tiers.map((tier,i)=><button key={tier} className={`tier-select ${selected===tier?'tier-selected':''}`} onClick={()=>setSelected(tier)}><span className="tier-select-num">{String(i+1).padStart(2,'0')}</span><TierBadge tier={tier}/><span className="tier-select-name">{tier.startsWith('H')?'High Tier':'Low Tier'}</span><span className="tier-select-count">{players.filter(p=>p.tier===tier).length}</span></button>)}</aside><section className="tier-detail"><div className="tier-detail-head"><div><div className="eyebrow muted-eyebrow">SELECTED TIER</div><h2><TierBadge tier={selected} large/><span className="tier-title-name">{selected.startsWith('H')?'High Tier':'Low Tier'} {selected.slice(2)}</span></h2><p>{descriptions[selected]}</p></div><div className="tier-detail-symbol">✦</div></div><div className="tier-detail-meta"><span>PLAYERS IN TIER</span><strong>{ranked.length}</strong><span className="tier-meta-separator"/><span>MODE</span><strong>Shieldless SMP</strong></div><div className="tier-player-list">{loading ? <div className="loading-line"><span/> Loading rankings…</div> : ranked.length ? ranked.map((p,i)=><Link className="tier-player-row" href={`/player/${encodeURIComponent(p.minecraftUsername)}`} key={p.discordId}><span className="tier-player-num">{String(i+1).padStart(2,'0')}</span><HeadAvatar username={p.minecraftUsername} size={42}/><span className="tier-player-name"><strong>{p.minecraftUsername}</strong><small>Shieldless SMP</small></span><span className="tier-player-since">RANKED PLAYER</span><span className="result-arrow">↗</span></Link>) : <div className="empty-state"><span className="empty-icon">✦</span><h3>No players in {selected} yet</h3><p>When a verified player earns this tier, they will appear here.</p></div>}</div><div className="tier-switch"><button onClick={()=>setSelected(tiers[Math.max(0,tiers.indexOf(selected)-1)])} disabled={selected===tiers[0]}>← Previous tier</button><button onClick={()=>setSelected(tiers[Math.min(9,tiers.indexOf(selected)+1)])} disabled={selected===tiers[9]}>Next tier →</button></div></section></div><div className="page-note"><span>ⓘ</span><p>Higher placement is better: HT1 is the highest tier, followed by LT1, HT2, and down to LT5.</p></div></div>;
+  const { players, loading } = usePlayers();
+  const [mode, setMode] = useState<(typeof modes)[number]>('A Totem');
+  const ranked = useMemo(() => [...players].sort((a, b) => a.minecraftUsername.localeCompare(b.minecraftUsername)), [players]);
+  return <div className="page-wrap rankings-page">
+    <div className="rankings-topline"><div><div className="eyebrow">RANKINGS / PLAYER TIERS</div><h1>Rankings</h1><p>Browse every tier in the SwimTiers ladder.</p></div>
+      <div className="rankings-mode-tabs" role="tablist" aria-label="Game mode">{modes.map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'rankings-mode active' : 'rankings-mode'} onClick={() => setMode(m)}>{m}</button>)}</div>
+    </div>
+    <div className="rankings-columns">{columns.map((column, colIndex) => {
+      const tierPlayers = column.tiers.map(t => ranked.filter(p => p.tier === t));
+      const total = tierPlayers.reduce((n, group) => n + group.length, 0);
+      return <section className={`rank-column rank-column-${colIndex + 1}`} key={column.title}>
+        <header className="rank-column-head"><h2>{column.title}</h2><span>{total}</span></header>
+        {column.tiers.map((tier, tierIndex) => <div className={`rank-tier-group ${tierIndex === 0 ? 'high-tier-group' : 'low-tier-group'}`} key={tier}>
+          <div className="rank-tier-label"><TierBadge tier={tier}/><span>{tier.startsWith('HT') ? 'High Tier' : 'Low Tier'}</span><small>{tierPlayers[tierIndex].length}</small></div>
+          {loading ? <div className="rank-empty">Loading…</div> : tierPlayers[tierIndex].length ? <div className="rank-player-list">{tierPlayers[tierIndex].map((player, index) => <Link className="rank-player" href={`/player/${encodeURIComponent(player.minecraftUsername)}`} key={player.discordId}><span className="rank-player-place">{index + 1}</span><HeadAvatar username={player.minecraftUsername} size={25}/><span className="rank-player-name">{player.minecraftUsername}</span><span className="rank-player-arrow">⌃</span></Link>)}</div> : <div className="rank-empty">No players yet</div>}
+        </div>)}
+      </section>;
+    })}</div>
+    <p className="rankings-footnote">Showing the {mode} ladder. Player names appear here once their tier data is synced.</p>
+  </div>;
 }
